@@ -8,6 +8,7 @@ import random
 import seaborn as sns
 import sys
 import math
+import itertools
 
 if (len(sys.argv) < 2):
     sys.exit('Please provide a KovaaK "/stats" path.')
@@ -35,18 +36,47 @@ for file in files:
                 else:
                     d[filename] = [{"date": date, "score": score}]
 
-rows = int(math.ceil(len(d)/5)) if int(math.ceil(len(d)/5)) != 0 else 1
+
+challenge_names = list(d.keys())
+
+# filter challenges not played many times
+for challenge_name in challenge_names:
+    if len(d[challenge_name]) < 10:
+        del(d[challenge_name])
+
+
+def get_date(t):
+    return t.get("date")
+
+
+# sort d by most recently played date
+# d = dict(sorted(d.items(), key=lambda item: max(
+    # item[1], key=get_date).get("date")))
+
+GRAPHS_PER_ROW = 7
+rows = int(math.ceil(len(d)/GRAPHS_PER_ROW)
+           ) if int(math.ceil(len(d)/GRAPHS_PER_ROW)) != 0 else 1
 columns = math.ceil(len(d)/rows)
+# fig, axes = plt.subplots(rows, columns, figsize=(12, 6), squeeze=False)
+fig, axes = plt.subplots(rows, columns, squeeze=False, sharex=True)
+
+palette = itertools.cycle(sns.color_palette())
+
+d_keys = reversed([k[0] for k in list(sorted(d.items(), key=lambda item: max(
+    item[1], key=get_date).get("date")))])
+
+i = 0
+row = 0
 column = 0
-fig, axes = plt.subplots(rows, columns, figsize=(12, 6), squeeze=False)
-fig.tight_layout(h_pad=5, w_pad=0)
-for i, key in enumerate(d.keys()):
+
+for key in d_keys:
     values = d[key]
     scores = [d['score'] for d in values]
     dates = [d['date'] for d in values]
-    ax = axes[i % rows][column - 1]
-    column = column + 1 if i % rows == 0 else column
-    sns.regplot(dates, scores, order=2, label=key, ax=ax)
+
+    ax = axes[row][column]
+    sns.regplot(x=dates, y=scores, order=2,
+                label=key, ax=ax, color=next(palette))
     xticks = ax.get_xticks()
     ax.set_xticklabels([datetime.fromtimestamp(tm).strftime('%Y-%m-%d') for tm in xticks],
                        rotation=30, fontsize=6)
@@ -56,5 +86,13 @@ for i, key in enumerate(d.keys()):
     if (i % columns) == 0:
         ax.set_ylabel('Score', fontsize=8)
 
+    if (column == columns - 1):
+        column = 0
+        row += 1
+    else:
+        column += 1
+
 fig.set_size_inches(12, fig.get_figheight())
+fig.tight_layout()
+
 plt.show()
